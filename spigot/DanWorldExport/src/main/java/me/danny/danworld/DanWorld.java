@@ -10,7 +10,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.function.Consumer;
+import java.util.zip.GZIPOutputStream;
 
+import org.bukkit.block.Biome;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class DanWorld {
@@ -19,23 +21,21 @@ public final class DanWorld {
     var l = genLogger(name);
     
     var version = 1;
-    var width = Math.abs(sel.min().getChunk().getX() - sel.max().getChunk().getX());
-    var depth = Math.abs(sel.min().getChunk().getZ() - sel.max().getChunk().getZ());
+    var width = Math.ceilDiv(Math.abs(sel.max().getBlockX() - sel.min().getBlockX()), 16);
+    var depth = Math.ceilDiv(Math.abs(sel.max().getBlockZ() - sel.min().getBlockZ()), 16);
     
     l.accept("Region to export is %dx%d (width x depth).".formatted(width, depth));
 
-    // var bitmaskLen = Math.ceilDiv(width * depth, 8);
-    // var bitmask = new int[bitmaskLen];
-
     byte[] bytes;
-    try(var b = new ByteArrayOutputStream(); var d = new DataOutputStream(b)) {
-      b.write(version);
-      b.write(width);
-      b.write(depth);
+    try(var b = new ByteArrayOutputStream(); var gz = new GZIPOutputStream(b); var d = new DataOutputStream(gz)) {
+      d.writeByte((byte)version);
+      d.writeShort((short)width);
+      d.writeShort((short)depth);
+
       
-      for(int x = sel.min().getChunk().getX(); x < sel.max().getChunk().getX(); x++) {
-        for(int z = sel.min().getChunk().getZ(); z < sel.max().getChunk().getZ(); z++) {
-          writeChunk(l, d, x, z, sel);
+      for(int x = 0; x < width; x++) {
+        for(int z = 0; z < depth; z++) {
+          writeChunk(l, d, 16 * x, 16 * z, sel);
         }
       }
 
@@ -72,29 +72,10 @@ public final class DanWorld {
 
 
   private static void writeChunk(Consumer<String> l, DataOutputStream d, int cx, int cz, Selection sel) throws IOException {
-    var world = sel.min().getWorld();
-
-    var heights = new short[256];
-    var biomes = new short[256];
+    l.accept("Writing chunk (%d, %d)...".formatted(cx / 16, cz / 16));
     
-    for(int x = 0; x < 16; x++) {
-      for(int z = 0; z < 16; z++) {
-        heights[z * 16 + x] = (short) (0xFFFF & world.getHighestBlockYAt(16 * cx + x, 16 * cz +  z));
-        biomes[z * 16 + x] = (short) 0;
-      }
-    }
-
-    l.accept("Writing chunk (%d, %d)...".formatted(cx, cz));
-    for(var height : heights) {
-      d.write(height);
-    }
-
-    for(var biome : biomes) {
-      d.write(biome);
-    }
-
     var numSections = Math.ceilDiv(sel.max().getBlockY() - sel.min().getBlockY(), 16);
-    d.write(numSections);
+    d.writeByte((byte)numSections);
     
     l.accept("Chunk (%d, %d) has %d sections.".formatted(cx, cz, numSections));
     for(int y = 0; y < numSections; y++) {
@@ -112,39 +93,53 @@ public final class DanWorld {
     var locs = new ArrayList<Vec3>();
     //And map the location to a material key
     var blocks = new HashMap<Vec3, String>();
+    var biomes = new HashMap<Vec3, Biome>();
 
     //Localize block lookups to the current chunk
-    var bx = 16 * (sel.min().getChunk().getX() + cx);
-    var bz = 16 * (sel.min().getChunk().getZ() + cz);
+    var bx = sel.min().getBlockX() + cx;
+    var bz = sel.min().getBlockZ() + cz;
     //And section Y (chunk sections)
     var by = sel.min().getBlockY() + (sectionY * 16);
 
     for(int y = 0; y < 16; y++) {
       for(int x = 0; x < 16; x++) {
         for(int z = 0; z < 16; z++) {
+          if(bx + x >= sel.max().getBlockX() || bz + z >= sel.max().getBlockZ() || by + y >= sel.max().getBlockY()) continue;
+          
           var v = new Vec3(x, y, z);
-          var matKey = world.getBlockAt(bx + x, by + y, bz + z).getType().getKey();
+          var block = world.getBlockAt(bx + x, by + y, bz + z);
+          var matKey = block.getType().getKey();
 
           locs.add(v);
           blocks.put(v, matKey.getKey());
+          biomes.put(v, world.getBiome(block.getLocation()));
           unique.add(matKey.getKey());
         }
       }
     }
 
-    l.accept("Chunk section (%d, y = %d, %d) block data scraped. Serializing.".formatted(cx, sectionY, cz));
+    l.accept("Chunk section y %d block data retrieved. Serializing.".formatted(sectionY));
     //Generate the palette. Order must be stable.
     var palette = new ArrayList<>(unique);
 
-    d.write(sectionY);
+    d.writeByte(sectionY);
+    d.writeByte(palette.size());
+    l.accept("Palette size being encoded is %d.".formatted(palette.size()));
+    l.accept("Palette is " + palette);
     writeStrings(d, palette);
-        
+
+    d.writeShort(locs.size());
+    l.accept("Saved %d blocks from this chunk section.".formatted(locs.size()));
     for(var vec : locs) {
       //Since iteration order is always xz per section, location data isn't needed
       //Write only the palette index of this block. The world loader will be able to
       //generate the location.
       var pIdx = palette.indexOf(blocks.get(vec));
-      d.write((byte)pIdx);
+      d.writeByte((byte)pIdx);
+    }
+
+    for(var vec : locs) {
+      d.writeByte(toBiomeId(biomes.get(vec)));
     }
   }
 
@@ -152,8 +147,80 @@ public final class DanWorld {
   private static void writeStrings(DataOutputStream d, ArrayList<String> strings) throws IOException {
     for(var s : strings) {
       var b = s.getBytes(Charset.defaultCharset()); //Should always be UTF-8
-      d.write(b.length);
+      d.writeByte(b.length);
       d.write(b); //Should always be UTF-8
     }
+  }
+
+  private static byte toBiomeId(Biome b) {    
+    return switch(b) {
+      case Biome.BADLANDS -> 0;
+      case Biome.BAMBOO_JUNGLE -> 1;
+      case Biome.BASALT_DELTAS -> 2;
+      case Biome.BEACH -> 3;
+      case Biome.BIRCH_FOREST -> 4;
+      case Biome.CHERRY_GROVE -> 5;
+      case Biome.COLD_OCEAN -> 6;
+      case Biome.CRIMSON_FOREST -> 7;
+      case Biome.DARK_FOREST -> 8;
+      case Biome.DEEP_COLD_OCEAN -> 9;
+      case Biome.DEEP_DARK -> 10;
+      case Biome.DEEP_FROZEN_OCEAN -> 11;
+      case Biome.DEEP_LUKEWARM_OCEAN -> 12;
+      case Biome.DEEP_OCEAN -> 13;
+      case Biome.DESERT -> 14;
+      case Biome.DRIPSTONE_CAVES -> 15;
+      case Biome.END_BARRENS -> 16;
+      case Biome.END_HIGHLANDS -> 17;
+      case Biome.END_MIDLANDS -> 18;
+      case Biome.ERODED_BADLANDS -> 19;
+      case Biome.FLOWER_FOREST -> 20;
+      case Biome.FOREST -> 21;
+      case Biome.FROZEN_OCEAN -> 22;
+      case Biome.FROZEN_PEAKS -> 23;
+      case Biome.FROZEN_RIVER -> 24;
+      case Biome.GROVE -> 25;
+      case Biome.ICE_SPIKES -> 26;
+      case Biome.JAGGED_PEAKS -> 27;
+      case Biome.JUNGLE -> 28;
+      case Biome.LUKEWARM_OCEAN -> 29;
+      case Biome.LUSH_CAVES -> 30;
+      case Biome.MANGROVE_SWAMP -> 31;
+      case Biome.MEADOW -> 32;
+      case Biome.MUSHROOM_FIELDS -> 33;
+      case Biome.NETHER_WASTES -> 34;
+      case Biome.OCEAN -> 35;
+      case Biome.OLD_GROWTH_BIRCH_FOREST -> 36;
+      case Biome.OLD_GROWTH_PINE_TAIGA -> 37;
+      case Biome.OLD_GROWTH_SPRUCE_TAIGA -> 38;
+      case Biome.PLAINS -> 39;
+      case Biome.RIVER -> 40;
+      case Biome.SAVANNA -> 41;
+      case Biome.SAVANNA_PLATEAU -> 42;
+      case Biome.SMALL_END_ISLANDS -> 43;
+      case Biome.SNOWY_BEACH -> 44;
+      case Biome.SNOWY_PLAINS -> 45;
+      case Biome.SNOWY_SLOPES -> 46;
+      case Biome.SNOWY_TAIGA -> 47;
+      case Biome.SOUL_SAND_VALLEY -> 48;
+      case Biome.SPARSE_JUNGLE -> 49;
+      case Biome.STONY_PEAKS -> 50;
+      case Biome.STONY_SHORE -> 51;
+      case Biome.SUNFLOWER_PLAINS -> 52;
+      case Biome.SWAMP -> 53;
+      case Biome.TAIGA -> 54;
+      case Biome.THE_END -> 55;
+      case Biome.THE_VOID -> 56;
+      case Biome.WARM_OCEAN -> 57;
+      case Biome.WARPED_FOREST -> 58;
+      case Biome.WINDSWEPT_FOREST -> 59;
+      case Biome.WINDSWEPT_GRAVELLY_HILLS -> 60;
+      case Biome.WINDSWEPT_HILLS -> 61;
+      case Biome.WINDSWEPT_SAVANNA -> 62;
+      case Biome.WOODED_BADLANDS -> 63;
+      
+      case Biome.CUSTOM -> toBiomeId(Biome.PLAINS);
+      default -> toBiomeId(Biome.PLAINS);
+    };
   }
 }
