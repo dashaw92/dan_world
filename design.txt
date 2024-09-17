@@ -1,0 +1,28 @@
+* Support all blocks from current minecraft version (valence_generated)
+* Does not need to be infinite or streamed, should be able to be held completely in memory
+* Biomes would be nice to have
+* Tile entities (signs, etc)
+* Living entities are not needed at all. All entities are spawned in game on the server, and are never serialized with the world
+* I would like to have compression so the world file isn't massive, but maybe it's not needed given these constraints? Or maybe it'll be free to add with minimal effort, in which case I do it anyways. Dunno!
+
+Format (this is a mimicry of Hypixel's Slime format):
+
+Version
+Width
+Depth
+Bitmask:
+	0 = all air
+	1 = present
+
+Chunk array size;
+Chunk array:
+	Heightmap - 256 ints (possible savings here?)
+	Biomes - 256 bytes
+	sections bitmask
+
+	sections:
+		2048 bytes block light
+		4096 bytes blocks (16 ^ 3)
+
+Tile entity array size;
+Tile entity array;
