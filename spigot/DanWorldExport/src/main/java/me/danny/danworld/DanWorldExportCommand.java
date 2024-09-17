@@ -40,8 +40,8 @@ public final class DanWorldExportCommand implements CommandExecutor {
     }
 
     p.sendMessage("Attempting to save. Monitor console for progress.");
-    if(DanWorld.save(Selection.fromWorldEditRegion(region), args[0])) {
-    	p.sendMessage("Success! World saved to " + args[0] + " in the plugin's folder.");
+    if(DanWorld.save(Selection.fromWorldEditRegion(region), toWorldName(args[0]))) {
+    	p.sendMessage("Success! World saved to " + toWorldName(args[0]) + " in the plugin's folder.");
     } else {
     	p.sendMessage("Save failed.");
     }
@@ -49,4 +49,8 @@ public final class DanWorldExportCommand implements CommandExecutor {
 	}
 
 
+	private static String toWorldName(String name) {
+		if(name.endsWith(".dan")) return name;
+		return name + ".dan";
+	}
 }

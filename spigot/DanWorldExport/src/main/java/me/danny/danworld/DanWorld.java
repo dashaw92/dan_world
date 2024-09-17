@@ -9,6 +9,7 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.zip.GZIPOutputStream;
 
@@ -28,6 +29,7 @@ public final class DanWorld {
 
     byte[] bytes;
     try(var b = new ByteArrayOutputStream(); var gz = new GZIPOutputStream(b); var d = new DataOutputStream(gz)) {
+      writeStrings(d, List.of("DanWorld"));
       d.writeByte((byte)version);
       d.writeShort((short)width);
       d.writeShort((short)depth);
@@ -122,7 +124,6 @@ public final class DanWorld {
     //Generate the palette. Order must be stable.
     var palette = new ArrayList<>(unique);
 
-    d.writeByte(sectionY);
     d.writeByte(palette.size());
     l.accept("Palette size being encoded is %d.".formatted(palette.size()));
     l.accept("Palette is " + palette);
@@ -144,7 +145,7 @@ public final class DanWorld {
   }
 
   //Write strings in a UTF-8 length-prefixed format. I don't like DataOutputStream#writeUTF
-  private static void writeStrings(DataOutputStream d, ArrayList<String> strings) throws IOException {
+  private static void writeStrings(DataOutputStream d, List<String> strings) throws IOException {
     for(var s : strings) {
       var b = s.getBytes(Charset.defaultCharset()); //Should always be UTF-8
       d.writeByte(b.length);

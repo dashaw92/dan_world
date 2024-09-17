@@ -26,7 +26,6 @@ pub struct DanChunk {
 
 #[derive(Debug)]
 pub struct DanChunkSection {
-    y: u8,
     palette: Vec<String>,
     blocks: Vec<u8>,
     biomes: Vec<DanBiome>,
@@ -37,6 +36,8 @@ impl DanWorld {
         let bytes = std::fs::read(path)?;
         let mut gz = GzDecoder::new(&bytes[..]);
 
+        let _magic = read_string(&mut gz)?;
+        assert_eq!(&_magic, "DanWorld");
         let version = gz.read_u8()?;
         let width = gz.read_u16::<BigEndian>()?;
         let depth = gz.read_u16::<BigEndian>()?;
@@ -70,7 +71,6 @@ fn read_chunk(c: &mut Cur) -> Result<DanChunk> {
 }
 
 fn read_chunk_section(c: &mut Cur) -> Result<DanChunkSection> {
-    let y = c.read_u8()?;
     let palette_len = c.read_u8()?;
     let mut palette = Vec::with_capacity(palette_len as usize);
 
@@ -87,7 +87,6 @@ fn read_chunk_section(c: &mut Cur) -> Result<DanChunkSection> {
     let biomes = biomes.into_iter().map(DanBiome::from).collect();
 
     Ok(DanChunkSection {
-        y,
         palette,
         blocks,
         biomes,

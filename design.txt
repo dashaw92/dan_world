@@ -1,28 +1,51 @@
-* Support all blocks from current minecraft version (valence_generated)
-* Does not need to be infinite or streamed, should be able to be held completely in memory
-* Biomes would be nice to have
+===============================================
+Format:
+===============================================
+Header:
+	Magic: "DanWorld" DanString
+	Version: u8
+	Width: u16
+	Depth: u16
+	Chunks: Chunk data[]
+
+Chunk data:
+	num_sections: u8 
+	Sections: Chunk sections[]
+
+Chunk sections:
+	palette_len: u8
+	Palette: DanString[] of Minecraft namespaced keys for indexing
+	blocks_len: u16
+	Blocks: u8[], value corresponds to the palette index
+	Biomes: u8[], DanBiome::from::<u8>()
+
+===============================================
+
+Types:
+===============================================
+DanString:
+	len: u8
+	bytes: len * UTF-8 encoded bytes
+===============================================
+
+Implementation:
+===============================================
+Chunks are always iterated over in XZ order, i.e.
+X = 0 Z = 0
+X = 0 Z = 1
+...
+X = 0 Z = n
+X = 1 Z = 0
+
+When Y is part of the iteration, the order is then YXZ.
+
+
+
+TODO:
+* Spawn position markers
+* Custom entity support (can be as simple as display entities with custom names and data)
+	* Entity[x = a, y = b, z = c, Name = "SheepTagSpawn"]
+	* Entity[x = a, y = b, z = c, Name = "WorldOrigin"]
+	* ...
 * Tile entities (signs, etc)
 * Living entities are not needed at all. All entities are spawned in game on the server, and are never serialized with the world
-* I would like to have compression so the world file isn't massive, but maybe it's not needed given these constraints? Or maybe it'll be free to add with minimal effort, in which case I do it anyways. Dunno!
-
-Format (this is a mimicry of Hypixel's Slime format):
-
-Version
-Width
-Depth
-Bitmask:
-	0 = all air
-	1 = present
-
-Chunk array size;
-Chunk array:
-	Heightmap - 256 ints (possible savings here?)
-	Biomes - 256 bytes
-	sections bitmask
-
-	sections:
-		2048 bytes block light
-		4096 bytes blocks (16 ^ 3)
-
-Tile entity array size;
-Tile entity array;
