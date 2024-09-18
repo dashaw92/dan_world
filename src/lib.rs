@@ -13,22 +13,22 @@ use flate2::read::GzDecoder;
 
 #[derive(Debug)]
 pub struct DanWorld {
-    version: u8,
-    width: u16,
-    depth: u16,
-    chunks: Vec<DanChunk>,
+    pub version: u8,
+    pub width: u16,
+    pub depth: u16,
+    pub chunks: Vec<DanChunk>,
 }
 
 #[derive(Debug)]
 pub struct DanChunk {
-    sections: Vec<DanChunkSection>,
+    pub sections: Vec<DanChunkSection>,
 }
 
 #[derive(Debug)]
 pub struct DanChunkSection {
-    palette: Vec<String>,
-    blocks: Vec<u8>,
-    biomes: Vec<DanBiome>,
+    pub palette: Vec<String>,
+    pub blocks: Vec<u8>,
+    pub biomes: Vec<DanBiome>,
 }
 
 impl DanWorld {

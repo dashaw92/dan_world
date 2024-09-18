@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.zip.GZIPOutputStream;
 
+import org.bukkit.Material;
 import org.bukkit.block.Biome;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -98,24 +99,34 @@ public final class DanWorld {
     var biomes = new HashMap<Vec3, Biome>();
 
     //Localize block lookups to the current chunk
-    var bx = sel.min().getBlockX() + cx;
-    var bz = sel.min().getBlockZ() + cz;
+    var baseX = sel.min().getBlockX() + cx;
+    var baseZ = sel.min().getBlockZ() + cz;
     //And section Y (chunk sections)
-    var by = sel.min().getBlockY() + (sectionY * 16);
+    var baseY = sel.min().getBlockY() + (sectionY * 16);
 
     for(int y = 0; y < 16; y++) {
       for(int x = 0; x < 16; x++) {
         for(int z = 0; z < 16; z++) {
-          if(bx + x >= sel.max().getBlockX() || bz + z >= sel.max().getBlockZ() || by + y >= sel.max().getBlockY()) continue;
-          
           var v = new Vec3(x, y, z);
-          var block = world.getBlockAt(bx + x, by + y, bz + z);
-          var matKey = block.getType().getKey();
+          var block = world.getBlockAt(baseX + x, baseY + y, baseZ + z);
+          //minecraft:grass_block
+          //          ^^^^^^^^^^^
+          var matKey = block.getType().getKey().getKey();
+          var biome = world.getBiome(block.getLocation());
+
+          //If the current block is outside of the bounds of the selection, rather than skip it completely,
+          //encode it as an empty block.
+          //NOTE: Once I get around to doing block data, probably keep a flag so I don't set data for these blocks.
+          if(baseX + x >= sel.max().getBlockX() || baseZ + z >= sel.max().getBlockZ() || baseY + y >= sel.max().getBlockY()) {
+            matKey = Material.VOID_AIR.getKey().getKey();
+            biome = Biome.PLAINS;
+          }
+          
 
           locs.add(v);
-          blocks.put(v, matKey.getKey());
-          biomes.put(v, world.getBiome(block.getLocation()));
-          unique.add(matKey.getKey());
+          blocks.put(v, matKey);
+          biomes.put(v, biome);
+          unique.add(matKey);
         }
       }
     }
