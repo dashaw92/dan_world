@@ -76,6 +76,8 @@ public final class DanWorld {
 
   private static void writeChunk(Consumer<String> l, DataOutputStream d, int cx, int cz, Selection sel) throws IOException {
     l.accept("Writing chunk (%d, %d)...".formatted(cx / 16, cz / 16));
+    d.writeShort(cx / 16);
+    d.writeShort(cz / 16);
     
     var numSections = Math.ceilDiv(sel.max().getBlockY() - sel.min().getBlockY(), 16);
     d.writeByte((byte)numSections);
@@ -117,7 +119,7 @@ public final class DanWorld {
           //If the current block is outside of the bounds of the selection, rather than skip it completely,
           //encode it as an empty block.
           //NOTE: Once I get around to doing block data, probably keep a flag so I don't set data for these blocks.
-          if(baseX + x >= sel.max().getBlockX() || baseZ + z >= sel.max().getBlockZ() || baseY + y >= sel.max().getBlockY()) {
+          if(baseX + x > sel.max().getBlockX() || baseZ + z > sel.max().getBlockZ() || baseY + y > sel.max().getBlockY()) {
             matKey = Material.VOID_AIR.getKey().getKey();
             biome = Biome.PLAINS;
           }

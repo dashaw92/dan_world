@@ -21,6 +21,8 @@ pub struct DanWorld {
 
 #[derive(Debug)]
 pub struct DanChunk {
+    pub x: u16,
+    pub z: u16,
     pub sections: Vec<DanChunkSection>,
 }
 
@@ -60,6 +62,9 @@ impl DanWorld {
 type Cur<'a> = GzDecoder<&'a [u8]>;
 
 fn read_chunk(c: &mut Cur) -> Result<DanChunk> {
+    let x = c.read_u16::<BigEndian>()?;
+    let z = c.read_u16::<BigEndian>()?;
+
     let mut sections = Vec::with_capacity(8);
 
     let num_sections = c.read_u8()?;
@@ -67,7 +72,7 @@ fn read_chunk(c: &mut Cur) -> Result<DanChunk> {
         sections.push(read_chunk_section(c)?);
     }
 
-    Ok(DanChunk { sections })
+    Ok(DanChunk { x, z, sections })
 }
 
 fn read_chunk_section(c: &mut Cur) -> Result<DanChunkSection> {

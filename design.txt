@@ -9,6 +9,8 @@ Header:
 	Chunks: Chunk data[]
 
 Chunk data:
+	x: u16
+	z: u16
 	num_sections: u8 
 	Sections: Chunk sections[]
 
