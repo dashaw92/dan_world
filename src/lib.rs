@@ -5,10 +5,13 @@ use std::{
     path::Path,
 };
 
+use blockdata::DanBlockData;
 use byteorder::{BigEndian, ReadBytesExt};
 
 mod biomes;
+mod blockdata;
 use biomes::DanBiome;
+
 use flate2::read::GzDecoder;
 
 #[derive(Debug)]
@@ -31,6 +34,7 @@ pub struct DanChunkSection {
     pub palette: Vec<String>,
     pub blocks: Vec<u8>,
     pub biomes: Vec<DanBiome>,
+    pub data: Vec<Vec<DanBlockData>>,
 }
 
 impl DanWorld {
@@ -91,10 +95,28 @@ fn read_chunk_section(c: &mut Cur) -> Result<DanChunkSection> {
     c.read_exact(&mut biomes)?;
     let biomes = biomes.into_iter().map(DanBiome::from).collect();
 
+    let num_data = c.read_u16::<BigEndian>()? as usize;
+    let mut data = Vec::with_capacity(num_data);
+    for _ in 0..num_data {
+        let block_data_len = c.read_u8()? as usize;
+        let mut current_data = Vec::with_capacity(block_data_len);
+
+        for _ in 0..num_data {
+            let Some(current) = blockdata::from(c.read_u16::<BigEndian>()?) else {
+                continue;
+            };
+
+            current_data.push(current);
+        }
+
+        data.push(current_data);
+    }
+
     Ok(DanChunkSection {
         palette,
         blocks,
         biomes,
+        data,
     })
 }
 
