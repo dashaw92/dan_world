@@ -20,6 +20,7 @@ Chunk sections:
 	blocks_len: u16
 	Blocks: u8[], value corresponds to the palette index
 	Biomes: u8[], DanBiome::from::<u8>()
+	Data: u16[], See impl notes
 
 ===============================================
 
@@ -32,14 +33,29 @@ DanString:
 
 Implementation:
 ===============================================
-Chunks are always iterated over in XZ order, i.e.
-X = 0 Z = 0
-X = 0 Z = 1
-...
-X = 0 Z = n
-X = 1 Z = 0
+Chunks
+	Chunks are always iterated over in XZ order, i.e.
+	X = 0 Z = 0
+	X = 0 Z = 1
+	...
+	X = 0 Z = n
+	X = 1 Z = 0
 
-When Y is part of the iteration, the order is then YXZ.
+	When Y is part of the iteration, the order is then YXZ.
+
+Block data
+	Block data is encoded as a length-prefixed number of u16s.
+	[0] means no data
+	[n, block, elems...]
+	 ^  ^
+	 |  +- Bit field: XXXX YYYY ZZZZ NNNN
+	 |                ^    ^    ^    ^
+	 |  			  |    |    |    +- Number of data elements for this block to follow
+	 |  			  |    |    +- Z coordinate in the chunk section (0 - 16)
+	 |  		      |    +- Y coordinate in the chunk section (0 - 16)
+	 |  			  +- X coordinate in the chunk section (0 - 16)
+	 +- Total number of block data entries in the array
+
 
 
 

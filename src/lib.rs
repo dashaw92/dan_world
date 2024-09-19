@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::{
+    collections::HashMap,
     io::{self, Read, Result},
     path::Path,
 };
@@ -34,7 +35,7 @@ pub struct DanChunkSection {
     pub palette: Vec<String>,
     pub blocks: Vec<u8>,
     pub biomes: Vec<DanBiome>,
-    pub data: Vec<Vec<DanBlockData>>,
+    pub data: HashMap<(usize, usize, usize), Vec<DanBlockData>>,
 }
 
 impl DanWorld {
@@ -96,10 +97,16 @@ fn read_chunk_section(c: &mut Cur) -> Result<DanChunkSection> {
     let biomes = biomes.into_iter().map(DanBiome::from).collect();
 
     let num_data = c.read_u16::<BigEndian>()? as usize;
-    let mut data = Vec::with_capacity(num_data);
+    let mut data = HashMap::with_capacity(num_data);
     for _ in 0..num_data {
-        let block_data_len = c.read_u8()? as usize;
-        let mut current_data = Vec::with_capacity(block_data_len);
+        let block_data_bits = c.read_u8()? as usize;
+
+        let block_x = (block_data_bits & 0b1111_0000_0000_0000) >> 12;
+        let block_y = (block_data_bits & 0b0000_1111_0000_0000) >> 8;
+        let block_z = (block_data_bits & 0b0000_0000_1111_0000) >> 4;
+        let data_len = block_data_bits & 0b0000_0000_0000_1111;
+
+        let mut current_data = Vec::with_capacity(data_len);
 
         for _ in 0..num_data {
             let Some(current) = blockdata::from(c.read_u16::<BigEndian>()?) else {
@@ -109,7 +116,7 @@ fn read_chunk_section(c: &mut Cur) -> Result<DanChunkSection> {
             current_data.push(current);
         }
 
-        data.push(current_data);
+        data.insert((block_x, block_y, block_z), current_data);
     }
 
     Ok(DanChunkSection {
