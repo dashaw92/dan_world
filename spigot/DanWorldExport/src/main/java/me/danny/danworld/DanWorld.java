@@ -15,6 +15,7 @@ import java.util.zip.GZIPOutputStream;
 
 import org.bukkit.Axis;
 import org.bukkit.Material;
+import org.bukkit.World.Environment;
 import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -51,6 +52,12 @@ public final class DanWorld {
     try(var b = new ByteArrayOutputStream(); var gz = new GZIPOutputStream(b); var d = new DataOutputStream(gz)) {
       writeStrings(d, List.of("DanWorld"));
       d.writeByte((byte)version);
+      d.writeByte((byte) switch(sel.min().getWorld().getEnvironment()) {
+        case Environment.NORMAL -> 0;
+        case Environment.NETHER -> 1;
+        case Environment.THE_END -> 2;
+        default -> 0;
+      });
       d.writeShort((short)width);
       d.writeShort((short)depth);
 

@@ -4,6 +4,7 @@ Format:
 Header:
 	Magic: "DanWorld" DanString
 	Version: u8
+	Dimension: u8 DanDimension
 	Width: u16
 	Depth: u16
 	Chunks: Chunk data[]
@@ -56,7 +57,10 @@ Block data
 	 |  			  +- X coordinate in the chunk section (0 - 16)
 	 +- Total number of block data entries in the array
 
-
+DanDimension
+	0 => Overworld
+	1 => Nether
+	2 => The End
 
 
 TODO:

@@ -18,9 +18,17 @@ use flate2::read::GzDecoder;
 #[derive(Debug)]
 pub struct DanWorld {
     pub version: u8,
+    pub dimension: DanDimension,
     pub width: u16,
     pub depth: u16,
     pub chunks: Vec<DanChunk>,
+}
+
+#[derive(Debug)]
+pub enum DanDimension {
+    Overworld,
+    Nether,
+    End,
 }
 
 #[derive(Debug)]
@@ -46,6 +54,14 @@ impl DanWorld {
         let _magic = read_string(&mut gz)?;
         assert_eq!(&_magic, "DanWorld");
         let version = gz.read_u8()?;
+
+        let dimension = match gz.read_u8()? {
+            0 => DanDimension::Overworld,
+            1 => DanDimension::Nether,
+            2 => DanDimension::End,
+            _ => DanDimension::Overworld,
+        };
+
         let width = gz.read_u16::<BigEndian>()?;
         let depth = gz.read_u16::<BigEndian>()?;
 
@@ -57,6 +73,7 @@ impl DanWorld {
 
         Ok(Self {
             version,
+            dimension,
             width,
             depth,
             chunks,
