@@ -19,6 +19,7 @@ import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.Ageable;
+import org.bukkit.block.data.Attachable;
 import org.bukkit.block.data.Bisected;
 import org.bukkit.block.data.Directional;
 import org.bukkit.block.data.Levelled;
@@ -28,8 +29,11 @@ import org.bukkit.block.data.Orientable;
 import org.bukkit.block.data.Rail;
 import org.bukkit.block.data.Rotatable;
 import org.bukkit.block.data.Waterlogged;
+import org.bukkit.block.data.type.Door;
 import org.bukkit.block.data.type.Snow;
 import org.bukkit.block.data.type.Stairs;
+import org.bukkit.block.data.type.Door.Hinge;
+import org.bukkit.block.data.type.Farmland;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class DanWorld {
@@ -330,7 +334,7 @@ public final class DanWorld {
 
     if(bd instanceof Waterlogged w) {
       var type = 0b0110;
-      if(w.isWaterLogged()) {
+      if(w.isWaterlogged()) {
         data.add(encode(type, 1));
       }
     }
@@ -400,6 +404,29 @@ public final class DanWorld {
       		case STRAIGHT -> 4;
       		default -> 4 /* Default to STRAIGHT */;
       };
+      data.add(encode(type, bits));
+    }
+
+    if(bd instanceof Attachable a) {
+      var type = 0b1100;
+      if(a.isAttached()) {
+        data.add(encode(type, 1));
+      }
+    }
+
+    if(bd instanceof Door d) {
+      var type = 0b1101;
+      var bits = switch(d.getHinge()) {
+        case Hinge.LEFT -> 0;
+        case Hinge.RIGHT -> 1;
+      };
+
+      data.add(encode(type, bits));
+    }
+
+    if(bd instanceof Farmland f) {
+      var type = 0b1110;
+      var bits = f.getMoisture();
       data.add(encode(type, bits));
     }
     

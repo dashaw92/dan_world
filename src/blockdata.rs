@@ -12,6 +12,15 @@ pub enum DanBlockData {
     Open(bool),
     RailShape(RailShape),
     StairShape(StairShape),
+    Attached(bool),
+    Hinge(Side),
+    Farmland(u8),
+}
+
+#[derive(Debug)]
+pub enum Side {
+    Left,  //0
+    Right, //1
 }
 
 #[derive(Debug)]
@@ -94,8 +103,27 @@ pub(crate) fn from(bits: u16) -> Option<DanBlockData> {
         0b1001 => open(data),
         0b1010 => railshape(data),
         0b1011 => stairshape(data),
+        0b1100 => attached(data),
+        0b1101 => hinge(data),
+        0b1110 => farmland(data),
         _ => return None,
     })
+}
+
+fn attached(bits: u16) -> DanBlockData {
+    DanBlockData::Attached(bits & 1 == 1)
+}
+
+fn hinge(bits: u16) -> DanBlockData {
+    DanBlockData::Hinge(match bits & 1 {
+        0 => Side::Left,
+        1 => Side::Right,
+        _ => Side::Left,
+    })
+}
+
+fn farmland(bits: u16) -> DanBlockData {
+    DanBlockData::Farmland((bits & 0xFF) as u8)
 }
 
 fn orientation(bits: u16) -> DanBlockData {
