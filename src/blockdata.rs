@@ -78,7 +78,7 @@ pub(crate) fn from(bits: u16) -> Option<DanBlockData> {
     const TYPE_MASK: u16 = 0b11110000_00000000;
     const DATA_MASK: u16 = !TYPE_MASK;
 
-    let prop_type = bits & TYPE_MASK;
+    let prop_type = (bits & TYPE_MASK) >> 12;
     let data = bits & DATA_MASK;
 
     Some(match prop_type {
@@ -150,7 +150,7 @@ fn multiplefacing(bits: u16) -> DanBlockData {
     let mut facing = Vec::with_capacity(6);
     let mut current_bit = 1;
     for i in 0..6 {
-        if bits & current_bit == 1 {
+        if bits & current_bit == current_bit {
             facing.push(i_to_dir(i));
         }
 

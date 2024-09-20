@@ -13,8 +13,23 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.zip.GZIPOutputStream;
 
+import org.bukkit.Axis;
 import org.bukkit.Material;
 import org.bukkit.block.Biome;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.Ageable;
+import org.bukkit.block.data.Bisected;
+import org.bukkit.block.data.Directional;
+import org.bukkit.block.data.Levelled;
+import org.bukkit.block.data.MultipleFacing;
+import org.bukkit.block.data.Openable;
+import org.bukkit.block.data.Orientable;
+import org.bukkit.block.data.Rail;
+import org.bukkit.block.data.Rotatable;
+import org.bukkit.block.data.Waterlogged;
+import org.bukkit.block.data.type.Snow;
+import org.bukkit.block.data.type.Stairs;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class DanWorld {
@@ -100,6 +115,8 @@ public final class DanWorld {
     var blocks = new HashMap<Vec3, String>();
     var biomes = new HashMap<Vec3, Biome>();
 
+    var data = new HashMap<Vec3, List<Short>>();
+
     //Localize block lookups to the current chunk
     var baseX = sel.min().getBlockX() + cx;
     var baseZ = sel.min().getBlockZ() + cz;
@@ -129,6 +146,11 @@ public final class DanWorld {
           blocks.put(v, matKey);
           biomes.put(v, biome);
           unique.add(matKey);
+
+          var blockData = encodeBlockData(block);
+          if(!blockData.isEmpty()) {
+            data.put(v, blockData);
+          }
         }
       }
     }
@@ -152,10 +174,25 @@ public final class DanWorld {
       d.writeByte((byte)pIdx);
     }
 
+    l.accept("Saving biomes.");
     for(var vec : locs) {
       d.writeByte(toBiomeId(biomes.get(vec)));
     }
+
+    l.accept("Saving block data from %d blocks.".formatted(data.size()));
+    d.writeShort((short) data.size());
+    for(var vec : data.keySet()) {
+      var vals = data.get(vec);
+
+      short blockDataBitfield = (short) (vec.x() << 12 | vec.y() << 8 | vec.z() << 4 | vals.size());
+      
+      d.writeShort(blockDataBitfield);
+      for(var bitfield : vals) {
+        d.writeShort(bitfield);
+      }
+    }
   }
+
 
   //Write strings in a UTF-8 length-prefixed format. I don't like DataOutputStream#writeUTF
   private static void writeStrings(DataOutputStream d, List<String> strings) throws IOException {
@@ -236,5 +273,161 @@ public final class DanWorld {
       case Biome.CUSTOM -> toBiomeId(Biome.PLAINS);
       default -> toBiomeId(Biome.PLAINS);
     };
+  }
+
+  private static short encode(int type, int data) {
+    return (short) (type << 12 | data);
+  }
+  
+  private static List<Short> encodeBlockData(Block block) {
+    var data = new ArrayList<Short>();
+    var bd = block.getBlockData();
+    
+    if(bd instanceof Orientable o) {
+      var type = 0b0000;
+      var bits = switch(o.getAxis()) {
+        case Axis.X -> 0;
+        case Axis.Y -> 1;
+        case Axis.Z -> 2;
+      };
+
+      data.add(encode(type, bits));
+    }
+
+    if(bd instanceof Ageable a) {
+      var type = 0b0001;
+      var bits = a.getAge();  
+      data.add(encode(type, bits));
+    }
+
+    if(bd instanceof Snow snow) {
+      var type = 0b0010;
+      var bits = snow.getLayers();
+      data.add(encode(type, bits));
+    }
+
+    if(bd instanceof Levelled le) {
+      var type = 0b0011;
+      var bits = le.getLevel();
+      data.add(encode(type, bits));
+    }
+
+    if(bd instanceof Bisected bisect) {
+      var type = 0b0100;
+      var bits = switch(bisect.getHalf()) {
+        case Bisected.Half.TOP -> 0;
+        case Bisected.Half.BOTTOM -> 1;
+      };
+      data.add(encode(type, bits));
+      
+    }
+
+    if(bd instanceof Directional dir) {
+      var type = 0b0101;
+      var bits = encodeDirection(dir.getFacing());
+      data.add(encode(type, bits));
+    }
+
+    if(bd instanceof Waterlogged w) {
+      var type = 0b0110;
+      if(w.isWaterLogged()) {
+        data.add(encode(type, 1));
+      }
+    }
+
+    if(bd instanceof Rotatable r) {
+      var type = 0b0111;
+      var bits = encodeDirection(r.getRotation());
+      data.add(encode(type, bits));
+    }
+
+    if(bd instanceof MultipleFacing mf) {
+      var type = 0b1000;
+      final int NORTH = 1;
+      final int SOUTH = 2;
+      final int EAST = 4;
+      final int WEST = 8;
+      final int UP = 16;
+      final int DOWN = 32;
+
+      int bits = 0;
+      for(var face : mf.getFaces()) {
+        switch(face) {
+          case BlockFace.NORTH -> bits |= NORTH;
+          case BlockFace.SOUTH -> bits |= SOUTH;
+          case BlockFace.EAST -> bits |= EAST;
+          case BlockFace.WEST -> bits |= WEST;
+          case BlockFace.UP -> bits |= UP;
+          case BlockFace.DOWN -> bits |= DOWN;
+          default -> {}
+        }
+      }
+      data.add(encode(type, bits));
+    }
+
+    if(bd instanceof Openable o) {
+      var type = 0b1001;
+      if(o.isOpen()) {
+        data.add(encode(type, 1));
+      }
+    }
+
+    if(bd instanceof Rail rail) {
+      var type = 0b1010;
+      var bits = switch(rail.getShape()) {
+      		case ASCENDING_EAST -> 1;
+      		case ASCENDING_NORTH -> 2;
+      		case ASCENDING_SOUTH -> 3;
+      		case ASCENDING_WEST -> 4;
+      		case EAST_WEST -> 5;
+      		case NORTH_EAST -> 6;
+      		case NORTH_SOUTH -> 7;
+      		case NORTH_WEST -> 8;
+      		case SOUTH_EAST -> 9;
+      		case SOUTH_WEST -> 10;
+      		default -> 5 /* Default to EAST_WEST */;
+      };
+      data.add(encode(type, bits));
+    }
+
+    if(bd instanceof Stairs stairs) {
+      var type = 0b1011;
+      var bits = switch(stairs.getShape()) {
+      		case INNER_LEFT -> 0;
+      		case INNER_RIGHT -> 1;
+      		case OUTER_LEFT -> 2;
+      		case OUTER_RIGHT -> 3;
+      		case STRAIGHT -> 4;
+      		default -> 4 /* Default to STRAIGHT */;
+      };
+      data.add(encode(type, bits));
+    }
+    
+    return data;
+  }
+
+  private static int encodeDirection(BlockFace facing) {
+    return switch(facing) {
+    		case BlockFace.DOWN -> 0;
+    		case BlockFace.EAST -> 1;
+    		case BlockFace.EAST_NORTH_EAST -> 2;
+    		case BlockFace.EAST_SOUTH_EAST -> 3;
+    		case BlockFace.NORTH -> 4;
+    		case BlockFace.NORTH_EAST -> 5;
+    		case BlockFace.NORTH_NORTH_EAST -> 6;
+    		case BlockFace.NORTH_NORTH_WEST -> 7;
+    		case BlockFace.NORTH_WEST -> 8;
+    		case BlockFace.SOUTH -> 9;
+    		case BlockFace.SOUTH_EAST -> 10;
+    		case BlockFace.SOUTH_SOUTH_EAST -> 11;
+    		case BlockFace.SOUTH_SOUTH_WEST -> 12;
+    		case BlockFace.SOUTH_WEST -> 13;
+    		case BlockFace.UP -> 14;
+    		case BlockFace.WEST -> 15;
+    		case BlockFace.WEST_NORTH_WEST -> 16;
+    		case BlockFace.WEST_SOUTH_WEST -> 17;
+    		default -> 4 /* Default to NORTH */;
+        
+      };
   }
 }

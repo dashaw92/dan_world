@@ -9,8 +9,8 @@ use std::{
 use blockdata::DanBlockData;
 use byteorder::{BigEndian, ReadBytesExt};
 
-mod biomes;
-mod blockdata;
+pub mod biomes;
+pub mod blockdata;
 use biomes::DanBiome;
 
 use flate2::read::GzDecoder;
@@ -99,16 +99,15 @@ fn read_chunk_section(c: &mut Cur) -> Result<DanChunkSection> {
     let num_data = c.read_u16::<BigEndian>()? as usize;
     let mut data = HashMap::with_capacity(num_data);
     for _ in 0..num_data {
-        let block_data_bits = c.read_u8()? as usize;
+        let block_data_bits = c.read_u16::<BigEndian>()? as usize;
 
         let block_x = (block_data_bits & 0b1111_0000_0000_0000) >> 12;
         let block_y = (block_data_bits & 0b0000_1111_0000_0000) >> 8;
         let block_z = (block_data_bits & 0b0000_0000_1111_0000) >> 4;
         let data_len = block_data_bits & 0b0000_0000_0000_1111;
-
         let mut current_data = Vec::with_capacity(data_len);
 
-        for _ in 0..num_data {
+        for _ in 0..data_len {
             let Some(current) = blockdata::from(c.read_u16::<BigEndian>()?) else {
                 continue;
             };
@@ -116,7 +115,9 @@ fn read_chunk_section(c: &mut Cur) -> Result<DanChunkSection> {
             current_data.push(current);
         }
 
-        data.insert((block_x, block_y, block_z), current_data);
+        if !current_data.is_empty() {
+            data.insert((block_x, block_y, block_z), current_data);
+        }
     }
 
     Ok(DanChunkSection {
