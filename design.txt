@@ -8,6 +8,7 @@ Header:
 	Width: u16
 	Depth: u16
 	Chunks: Chunk data[]
+	Extra: DanExtra[]
 
 Chunk data:
 	x: u16
@@ -23,6 +24,11 @@ Chunk sections:
 	Biomes: u8[], DanBiome::from::<u8>()
 	Data: u16[], See impl notes
 
+Number of DanExtra: u16
+DanExtra[]:
+	Key: DanString,
+	Value: u8[]
+
 ===============================================
 
 Types:
@@ -30,6 +36,10 @@ Types:
 DanString:
 	len: u8
 	bytes: len * UTF-8 encoded bytes
+
+Array<T>:
+	len: numeric, this is not standard across different uses, sorry
+	bytes: T[len]
 ===============================================
 
 Implementation:

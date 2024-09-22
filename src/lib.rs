@@ -11,8 +11,10 @@ use byteorder::{BigEndian, ReadBytesExt};
 
 pub mod biomes;
 pub mod blockdata;
+pub mod extra;
 use biomes::DanBiome;
 
+use extra::DanExtra;
 use flate2::read::GzDecoder;
 
 #[derive(Debug)]
@@ -22,6 +24,7 @@ pub struct DanWorld {
     pub width: u16,
     pub depth: u16,
     pub chunks: Vec<DanChunk>,
+    extra: HashMap<String, DanExtra>,
 }
 
 #[derive(Debug)]
@@ -71,13 +74,25 @@ impl DanWorld {
             chunks.push(read_chunk(&mut gz)?);
         }
 
+        let num_extra = gz.read_u16::<BigEndian>()? as usize;
+        let mut extra = HashMap::with_capacity(num_extra);
+        for _ in 0..num_extra {
+            let (key, data) = DanExtra::from_buf(&mut gz)?;
+            extra.insert(key, data);
+        }
+
         Ok(Self {
             version,
             dimension,
             width,
             depth,
             chunks,
+            extra,
         })
+    }
+
+    pub fn get_extra(&self, key: &str) -> Option<&DanExtra> {
+        self.extra.get(key)
     }
 }
 
@@ -145,7 +160,7 @@ fn read_chunk_section(c: &mut Cur) -> Result<DanChunkSection> {
     })
 }
 
-fn read_string(c: &mut Cur) -> Result<String> {
+pub(crate) fn read_string<W: ReadBytesExt>(c: &mut W) -> Result<String> {
     let len = c.read_u8()? as usize;
     let mut buf = vec![0; len];
     c.read_exact(&mut buf)?;
