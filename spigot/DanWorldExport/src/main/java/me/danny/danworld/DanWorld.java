@@ -63,7 +63,7 @@ public final class DanWorld {
     //Does null check
     world.setName(yml.getString("name"));
     //Does null check
-    world.setDimension(Environment.valueOf(yml.getString("dimension")));
+    world.setDimension(Environment.valueOf(yml.getString("dimension", Environment.NORMAL.name())));
 
     if(yml.contains("selWorld")) {
       var selWorld = yml.getString("selWorld");

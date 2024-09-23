@@ -71,7 +71,7 @@ public record Selection(Location min, Location max) {
     }
   }
 
-  public boolean contains(int x, int y, int z) {
+  public boolean contains(double x, double y, double z) {
     return x >= min.getBlockX() && x <= max.getBlockX()
       && y >= min.getBlockY() && y <= max.getBlockY()
       && z >= min.getBlockZ() && z <= max.getBlockZ();
