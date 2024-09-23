@@ -5,6 +5,7 @@ author: Danny
 description: Export a selection to a DanWorld file
 api-version: 1.20
 commands:
-  savedanworld:
+  danworld:
+    aliases: ['dw']
     usage: /<command>
-    description: Export your WorldEdit selection to a DanWorld.
+    description: Manage DanWorlds.

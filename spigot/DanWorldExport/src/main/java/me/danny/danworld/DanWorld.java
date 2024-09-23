@@ -11,11 +11,13 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.zip.GZIPOutputStream;
 
 import org.bukkit.Axis;
 import org.bukkit.Material;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.World.Environment;
 import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
@@ -41,6 +43,91 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class DanWorld {
   public static final int CURRENT_VERSION = 1;
 
+  public static Optional<DanWorld> loadFromFile(File file) {
+    if(file == null || !file.exists()) {
+      return Optional.empty();
+    }
+
+    var yml = YamlConfiguration.loadConfiguration(file);
+    var version = yml.getInt("version");
+
+    //This is protected against the yml file not existing.
+    //getInt returns 0 when the path is invalid, and CURRENT_VERSION is always != 0.
+    //In this way, if the YML is blank, this will immediately cause the function to abort.
+    if(version != CURRENT_VERSION) {
+      System.err.println("Invalid version!");
+      return Optional.empty();
+    }
+
+    var world = new DanWorld();
+    //Does null check
+    world.setName(yml.getString("name"));
+    //Does null check
+    world.setDimension(Environment.valueOf(yml.getString("dimension")));
+
+    if(yml.contains("selWorld")) {
+      var selWorld = yml.getString("selWorld");
+      var selMin = yml.getString("selMin");
+      var selMax = yml.getString("selMax");
+
+      //Returns null on error
+      var sel = Selection.fromStrings(selWorld, selMin, selMax);
+      //Does null check
+      world.setSelection(sel);
+    }
+
+    if(yml.contains("extra")) {
+      for(var key : yml.getConfigurationSection("extra").getKeys(false)) {
+        var savedData = yml.getByteList("extra." + key);
+        var bytes = new byte[savedData.size()];
+
+        for(int i = 0; i < savedData.size(); i++) {
+          bytes[i] = savedData.get(i);
+        }
+
+        world.setExtra(key, bytes);
+      }
+    }
+    
+    return Optional.of(world);
+  }
+
+  public static void saveToFile(DanWorld world, File out) {
+    if(world == null) return;
+
+    var yml = new YamlConfiguration();
+    yml.set("version", world.version);
+    if(world.name != null) yml.set("name", world.name);
+    if(world.dimension != null) yml.set("dimension", world.dimension.name());
+    if(world.sel != null) {
+      var serialized = Selection.intoStrings(world.sel);
+      if(serialized != null) {
+        yml.set("selWorld", serialized[0]);
+        yml.set("selMin", serialized[1]);
+        yml.set("selMax", serialized[2]);
+      }
+    }
+
+    if(!world.extra.isEmpty()) {
+      for(String key : world.extra.keySet()) {
+        var bytes = world.extra.get(key);
+        var bytesList = new ArrayList<Byte>();
+        for(byte b : bytes) {
+          bytesList.add(b);
+        }
+
+        yml.set("extra." + key, bytesList);
+      }
+    }
+
+    try {
+      yml.save(out);
+    } catch(Exception _ignored) {
+      System.err.println("Failed to save DanWorld project to YML config:");
+      _ignored.printStackTrace();
+    }
+  }
+  
   private int version;
   private Environment dimension;
 
@@ -160,7 +247,7 @@ public final class DanWorld {
   private static void writeExtra(Consumer<String> l, DataOutputStream d, Map<String, byte[]> extra) throws IOException {
     var len = extra.size();
     l.accept("Writing %d extra KV entries.".formatted(len));
-    d.write(len);
+    d.writeInt(len);
 
     for(var key : extra.keySet()) {
       writeString(d, key);

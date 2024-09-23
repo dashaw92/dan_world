@@ -6,6 +6,6 @@ public final class DanWorldExportPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        getCommand("savedanworld").setExecutor(new DanWorldExportCommand()); 
+        getCommand("danworld").setExecutor(new DanWorldCommand()); 
     }
 }
