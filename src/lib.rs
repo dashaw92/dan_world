@@ -74,7 +74,7 @@ impl DanWorld {
             chunks.push(read_chunk(&mut gz)?);
         }
 
-        let num_extra = gz.read_u16::<BigEndian>()? as usize;
+        let num_extra = gz.read_u32::<BigEndian>()? as usize;
         let mut extra = HashMap::with_capacity(num_extra);
         for _ in 0..num_extra {
             let (key, data) = DanExtra::from_buf(&mut gz)?;

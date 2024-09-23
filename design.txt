@@ -24,7 +24,7 @@ Chunk sections:
 	Biomes: u8[], DanBiome::from::<u8>()
 	Data: u16[], See impl notes
 
-Number of DanExtra: u16
+Number of DanExtra: u32
 DanExtra[]:
 	Key: DanString,
 	Value: u8[]

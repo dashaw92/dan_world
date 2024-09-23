@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.zip.GZIPOutputStream;
 
@@ -31,18 +32,73 @@ import org.bukkit.block.data.Rail;
 import org.bukkit.block.data.Rotatable;
 import org.bukkit.block.data.Waterlogged;
 import org.bukkit.block.data.type.Door;
-import org.bukkit.block.data.type.Snow;
-import org.bukkit.block.data.type.Stairs;
 import org.bukkit.block.data.type.Door.Hinge;
 import org.bukkit.block.data.type.Farmland;
+import org.bukkit.block.data.type.Snow;
+import org.bukkit.block.data.type.Stairs;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class DanWorld {
+  public static final int CURRENT_VERSION = 1;
 
-  public static boolean save(Selection sel, String name) {
+  private int version;
+  private Environment dimension;
+
+  private Selection sel;
+
+  private Map<String, byte[]> extra;
+
+  private String name;
+
+  public DanWorld() {
+    version = CURRENT_VERSION;
+    extra = new HashMap<>();
+  }
+
+  public void setDimension(Environment dim) {
+    dimension = dim == null? dimension : dim;
+  }
+
+  public Environment getDimension() {
+    if(dimension != null) return dimension;
+    if(sel != null) return sel.min().getWorld().getEnvironment();
+    
+    return Environment.NORMAL;
+  }
+
+  public void setName(String name) {
+    this.name = (name == null || name.isBlank())? this.name : name;
+  }
+
+  public String getName() {
+    return (name == null || name.isBlank())? "<Unnamed world>" : name;
+  }
+
+  public void setExtra(String key, byte[] data) {
+    extra.put(key, data);
+  }
+
+  public byte[] getExtra(String key) {
+    return extra.get(key);
+  }
+
+  public Selection getSelection() {
+    return sel;
+  }
+
+  public void setSelection(Selection newSel) {
+    sel = newSel == null? sel : newSel;
+  }
+
+  public boolean readyToExport() {
+    return name != null && sel != null;
+  }
+
+  public boolean exportWorld() {
+    if(!readyToExport()) return false;
+    
     var l = genLogger(name);
     
-    var version = 1;
     var width = Math.ceilDiv(Math.abs(sel.max().getBlockX() - sel.min().getBlockX()), 16);
     var depth = Math.ceilDiv(Math.abs(sel.max().getBlockZ() - sel.min().getBlockZ()), 16);
     
@@ -50,9 +106,9 @@ public final class DanWorld {
 
     byte[] bytes;
     try(var b = new ByteArrayOutputStream(); var gz = new GZIPOutputStream(b); var d = new DataOutputStream(gz)) {
-      writeStrings(d, List.of("DanWorld"));
+      writeString(d, "DanWorld");
       d.writeByte((byte)version);
-      d.writeByte((byte) switch(sel.min().getWorld().getEnvironment()) {
+      d.writeByte((byte) switch(getDimension()) {
         case Environment.NORMAL -> 0;
         case Environment.NETHER -> 1;
         case Environment.THE_END -> 2;
@@ -68,6 +124,8 @@ public final class DanWorld {
         }
       }
 
+      writeExtra(l, d, extra);
+      
       d.close();
       bytes = b.toByteArray();
     } catch(IOException e) {
@@ -99,6 +157,22 @@ public final class DanWorld {
     return (msg) -> plug.getLogger().info("[Export of <%s>]: %s".formatted(name, msg));
   }
 
+  private static void writeExtra(Consumer<String> l, DataOutputStream d, Map<String, byte[]> extra) throws IOException {
+    var len = extra.size();
+    l.accept("Writing %d extra KV entries.".formatted(len));
+    d.write(len);
+
+    for(var key : extra.keySet()) {
+      writeString(d, key);
+      var bytes = extra.get(key);
+      d.writeShort((short) bytes.length);
+      for(byte by : bytes) {
+        d.writeByte(by);
+      }
+
+      l.accept("Extra \"%s\" saved (%d bytes)".formatted(key, bytes.length));
+    }
+  }
 
   private static void writeChunk(Consumer<String> l, DataOutputStream d, int cx, int cz, Selection sel) throws IOException {
     l.accept("Writing chunk (%d, %d)...".formatted(cx / 16, cz / 16));
@@ -203,15 +277,18 @@ public final class DanWorld {
       }
     }
   }
-
-
+  
   //Write strings in a UTF-8 length-prefixed format. I don't like DataOutputStream#writeUTF
   private static void writeStrings(DataOutputStream d, List<String> strings) throws IOException {
     for(var s : strings) {
-      var b = s.getBytes(Charset.defaultCharset()); //Should always be UTF-8
-      d.writeByte(b.length);
-      d.write(b); //Should always be UTF-8
+      writeString(d, s);
     }
+  }
+
+  private static void writeString(DataOutputStream d, String str) throws IOException {
+    var b = str.getBytes(Charset.defaultCharset()); //Should always be UTF-8
+    d.writeByte(b.length);
+    d.write(b); //Should always be UTF-8
   }
 
   private static byte toBiomeId(Biome b) {    
