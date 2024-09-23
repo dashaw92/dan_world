@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-valence_generated = { git = "https://github.com/valence-rs/valence.git" }
-valence_nbt = { git = "https://github.com/valence-rs/valence.git" }
+# valence_generated = { git = "https://github.com/valence-rs/valence.git" }
+# valence_nbt = { git = "https://github.com/valence-rs/valence.git" }
 byteorder = "1"
 flate2 = "1.0.33"
+anyhow = "1.0.89"
